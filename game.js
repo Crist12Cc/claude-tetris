@@ -59,6 +59,8 @@ function applyTheme(theme) {
     delete document.documentElement.dataset.theme;
   }
   readThemeColors();
+  if (current) draw();
+  if (next) drawNext();
 }
 
 function initTheme() {
