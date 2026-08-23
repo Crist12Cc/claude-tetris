@@ -39,8 +39,48 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const themeToggle = document.getElementById('theme-toggle');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let themeColors = { gridLine: '#22222e', blockHighlight: 'rgba(255,255,255,0.12)' };
+
+function readThemeColors() {
+  const style = getComputedStyle(document.documentElement);
+  themeColors = {
+    gridLine: style.getPropertyValue('--grid-line').trim() || '#22222e',
+    blockHighlight: style.getPropertyValue('--block-highlight').trim() || 'rgba(255,255,255,0.12)',
+  };
+}
+
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.documentElement.dataset.theme = 'light';
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+  readThemeColors();
+  if (current) draw();
+  if (next) drawNext();
+}
+
+function initTheme() {
+  if (!themeToggle) return;
+
+  let saved = 'dark';
+  try {
+    saved = localStorage.getItem('tetris-theme') || 'dark';
+  } catch {}
+
+  applyTheme(saved);
+  themeToggle.checked = saved === 'light';
+  themeToggle.addEventListener('change', () => {
+    const theme = themeToggle.checked ? 'light' : 'dark';
+    applyTheme(theme);
+    try {
+      localStorage.setItem('tetris-theme', theme);
+    } catch {}
+  });
+}
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -163,13 +203,13 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
+  context.fillStyle = themeColors.blockHighlight;
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
   context.globalAlpha = 1;
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = themeColors.gridLine;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -301,4 +341,5 @@ document.addEventListener('keydown', e => {
 
 restartBtn.addEventListener('click', init);
 
+initTheme();
 init();
