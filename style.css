@@ -233,6 +233,11 @@ kbd {
   height: 0;
 }
 
+.theme-toggle input:focus-visible ~ .track {
+  outline: 2px solid var(--value-color);
+  outline-offset: 3px;
+}
+
 .theme-toggle .track {
   width: 44px;
   height: 24px;
