@@ -62,13 +62,21 @@ function applyTheme(theme) {
 }
 
 function initTheme() {
-  const saved = localStorage.getItem('tetris-theme') || 'dark';
+  if (!themeToggle) return;
+
+  let saved = 'dark';
+  try {
+    saved = localStorage.getItem('tetris-theme') || 'dark';
+  } catch {}
+
   applyTheme(saved);
   themeToggle.checked = saved === 'light';
   themeToggle.addEventListener('change', () => {
     const theme = themeToggle.checked ? 'light' : 'dark';
     applyTheme(theme);
-    localStorage.setItem('tetris-theme', theme);
+    try {
+      localStorage.setItem('tetris-theme', theme);
+    } catch {}
   });
 }
 
