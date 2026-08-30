@@ -94,45 +94,46 @@ function initTheme() {
   });
 }
 
-function loadHighScores() {
+function readJSON(key) {
   try {
-    const raw = localStorage.getItem(HIGHSCORES_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return [];
+    return null;
   }
+}
+
+function writeJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+function loadHighScores() {
+  const parsed = readJSON(HIGHSCORES_KEY);
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function saveHighScores(list) {
-  try {
-    localStorage.setItem(HIGHSCORES_KEY, JSON.stringify(list));
-  } catch {}
+  writeJSON(HIGHSCORES_KEY, list);
 }
 
 function loadRecords() {
-  try {
-    const raw = localStorage.getItem(RECORDS_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return {
-      bestCombo: parsed && Number.isFinite(parsed.bestCombo) ? parsed.bestCombo : 0,
-      maxLines: parsed && Number.isFinite(parsed.maxLines) ? parsed.maxLines : 0,
-    };
-  } catch {
-    return { bestCombo: 0, maxLines: 0 };
-  }
+  const parsed = readJSON(RECORDS_KEY);
+  return {
+    bestCombo: parsed && Number.isFinite(parsed.bestCombo) ? parsed.bestCombo : 0,
+    maxLines: parsed && Number.isFinite(parsed.maxLines) ? parsed.maxLines : 0,
+  };
 }
 
 function saveRecords(records) {
-  try {
-    localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
-  } catch {}
+  writeJSON(RECORDS_KEY, records);
 }
 
-function qualifiesForHighScore(candidateScore) {
-  const list = loadHighScores();
-  if (list.length < MAX_HIGHSCORES) return true;
-  const lowest = list[list.length - 1];
+function qualifiesForHighScore(candidateScore, list) {
+  const scores = list || loadHighScores();
+  if (scores.length < MAX_HIGHSCORES) return true;
+  const lowest = scores[scores.length - 1];
   return candidateScore > (lowest ? lowest.score : 0);
 }
 
@@ -147,7 +148,24 @@ function addHighScore(name, entryScore, entryLines, entryLevel) {
 }
 
 function resetRecords() {
-  if (!window.confirm('¿Seguro que deseas borrar los récords guardados?')) return;
+  // The reset button only lives in the sidebar, which is only reachable while
+  // a round is actively running (not paused, not game-over) since the overlay
+  // covers the whole panel otherwise. window.confirm() blocks the main thread,
+  // so suspend the drop loop around it — otherwise the wall-clock time the
+  // dialog was open gets credited as drop time on the very next frame,
+  // causing a jarring instant drop/lock the moment the dialog closes.
+  // (Deliberately not reusing togglePause()/#overlay here: its "resume"
+  // branch doesn't re-hide the overlay, which would leave the board stuck
+  // behind it — a separate pre-existing gap, orthogonal to this fix.)
+  const wasRunning = !paused && !gameOver;
+  if (wasRunning) cancelAnimationFrame(animId);
+  const confirmed = window.confirm('¿Seguro que deseas borrar los récords guardados?');
+  if (wasRunning) {
+    lastTime = performance.now();
+    dropAccum = 0;
+    animId = requestAnimationFrame(loop);
+  }
+  if (!confirmed) return;
   try {
     localStorage.removeItem(HIGHSCORES_KEY);
     localStorage.removeItem(RECORDS_KEY);
@@ -155,8 +173,8 @@ function resetRecords() {
   renderRecords();
 }
 
-function renderRecords(highlightIndex) {
-  const list = loadHighScores();
+function renderRecords(highlightIndex, listOverride) {
+  const list = listOverride || loadHighScores();
   const records = loadRecords();
 
   highscoresListEl.innerHTML = '';
@@ -176,11 +194,11 @@ function renderRecords(highlightIndex) {
 
       const name = document.createElement('span');
       name.className = 'name';
-      name.textContent = entry.name;
+      name.textContent = (entry && entry.name) || 'AAA';
 
       const scoreVal = document.createElement('span');
       scoreVal.className = 'score';
-      scoreVal.textContent = Number(entry.score || 0).toLocaleString();
+      scoreVal.textContent = Number((entry && entry.score) || 0).toLocaleString();
 
       li.appendChild(rank);
       li.appendChild(name);
@@ -193,14 +211,21 @@ function renderRecords(highlightIndex) {
   maxLinesRecordEl.textContent = records.maxLines;
 }
 
+function sanitizeName(rawName) {
+  const trimmed = rawName.trim();
+  // Slice by Unicode code points (not UTF-16 code units) so an emoji or other
+  // astral character near the limit doesn't get split into an orphan surrogate.
+  const chars = Array.from(trimmed || 'AAA');
+  return chars.slice(0, 10).join('').toUpperCase();
+}
+
 function handleSaveScore() {
   if (!pendingScoreEntry) return;
-  const rawName = playerNameInput.value.trim();
-  const name = (rawName || 'AAA').slice(0, 10).toUpperCase();
-  const { index } = addHighScore(name, pendingScoreEntry.score, pendingScoreEntry.lines, pendingScoreEntry.level);
+  const name = sanitizeName(playerNameInput.value);
+  const { list, index } = addHighScore(name, pendingScoreEntry.score, pendingScoreEntry.lines, pendingScoreEntry.level);
   pendingScoreEntry = null;
   nameEntryEl.classList.add('hidden');
-  renderRecords(index);
+  renderRecords(index, list);
 }
 
 function createBoard() {
@@ -395,7 +420,8 @@ function endGame() {
   if (lines > records.maxLines) { records.maxLines = lines; recordsUpdated = true; }
   if (recordsUpdated) saveRecords(records);
 
-  if (qualifiesForHighScore(score)) {
+  const highScoreList = loadHighScores();
+  if (qualifiesForHighScore(score, highScoreList)) {
     pendingScoreEntry = { score, lines, level };
     playerNameInput.value = '';
     nameEntryEl.classList.remove('hidden');
@@ -404,7 +430,7 @@ function endGame() {
     pendingScoreEntry = null;
     nameEntryEl.classList.add('hidden');
   }
-  renderRecords();
+  renderRecords(undefined, highScoreList);
 
   overlay.classList.remove('hidden');
 }
@@ -424,6 +450,13 @@ function togglePause() {
 }
 
 function loop(ts) {
+  // A lockPiece() -> spawn() -> endGame() call can happen from inside a loop()
+  // invocation that is already past this point in its own call stack; that
+  // in-flight call still falls through to its own requestAnimationFrame at the
+  // bottom, which would overwrite endGame()'s cancelAnimationFrame with a new
+  // scheduled frame. Bail out immediately once the game is over so the loop
+  // actually stops instead of ticking (and re-running endGame()) every frame.
+  if (gameOver) return;
   const dt = ts - lastTime;
   lastTime = ts;
   dropAccum += dt;
@@ -486,10 +519,19 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+function handleRestart() {
+  // The restart button stays visible in the same overlay as the name-entry
+  // form. If a just-finished run qualified for the top 5 but the player
+  // clicks Reiniciar instead of Guardar, auto-save it (with whatever name is
+  // currently typed, defaulting to "AAA") rather than silently losing it.
+  if (pendingScoreEntry) handleSaveScore();
+  init();
+}
+
+restartBtn.addEventListener('click', handleRestart);
 saveScoreBtn.addEventListener('click', handleSaveScore);
 playerNameInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' && !e.isComposing) {
     e.preventDefault();
     handleSaveScore();
   }
