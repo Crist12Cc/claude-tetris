@@ -28,8 +28,19 @@ const PIECES = [
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
-// Mixes a hex color with white (amount > 0) or black (amount < 0), amount in [-1, 1].
+// Single source of truth for valid skin values (must stay in sync with the
+// <option> values in index.html and the [data-skin="..."] blocks in style.css).
+const SKINS = ['retro', 'neon', 'pastel', 'pixel'];
+
+// Mixes a hex color with white (amount > 0) or black (amount < 0), amount clamped to [-1, 1].
+// Results are memoized since pixel-skin rendering calls this per block, every frame.
+const mixColorCache = new Map();
 function mixColor(hex, amount) {
+  amount = Math.max(-1, Math.min(1, amount));
+  const key = hex + '|' + amount;
+  const cached = mixColorCache.get(key);
+  if (cached) return cached;
+
   const num = parseInt(hex.slice(1), 16);
   let r = (num >> 16) & 0xff;
   let g = (num >> 8) & 0xff;
@@ -43,7 +54,9 @@ function mixColor(hex, amount) {
     g = Math.round(g * (1 + amount));
     b = Math.round(b * (1 + amount));
   }
-  return `rgb(${r}, ${g}, ${b})`;
+  const result = `rgb(${r}, ${g}, ${b})`;
+  mixColorCache.set(key, result);
+  return result;
 }
 
 const PASTEL_COLORS = COLORS.map(c => (c ? mixColor(c, 0.45) : null));
@@ -116,7 +129,7 @@ function readThemeColors() {
 }
 
 function applySkin(skin) {
-  currentSkin = skin === 'neon' || skin === 'pastel' || skin === 'pixel' ? skin : 'retro';
+  currentSkin = SKINS.includes(skin) ? skin : 'retro';
   document.documentElement.dataset.skin = currentSkin;
   readThemeColors();
   if (current) draw();
@@ -279,8 +292,14 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
     roundedRectPath(context, px, py, s, s, r);
     context.fillStyle = color;
     context.fill();
+    // Clip the highlight bar to the same rounded silhouette so its square
+    // corners don't poke out past the body's rounded corners.
+    context.save();
+    roundedRectPath(context, px, py, s, s, r);
+    context.clip();
     context.fillStyle = themeColors.blockHighlight;
     context.fillRect(px, py, s, 4);
+    context.restore();
   } else if (currentSkin === 'pixel') {
     const color = COLORS[colorIndex];
     context.fillStyle = color;
