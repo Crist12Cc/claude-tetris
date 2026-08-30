@@ -10,6 +10,14 @@
   <div class="wrapper">
     <div class="title-row">
       <h1 class="game-title">TETRIS</h1>
+      <label class="skin-select-label" for="skin-select" title="Cambiar skin">
+        <select id="skin-select" aria-label="Cambiar skin">
+          <option value="retro">Retro</option>
+          <option value="neon">Neon</option>
+          <option value="pastel">Pastel</option>
+          <option value="pixel">Pixel art</option>
+        </select>
+      </label>
       <label class="theme-toggle" for="theme-toggle" title="Cambiar tema claro/oscuro">
         <input type="checkbox" id="theme-toggle" aria-label="Cambiar tema claro/oscuro" />
         <span class="track"><span class="thumb"></span></span>
@@ -47,6 +55,20 @@
             <li><kbd>P</kbd> pausa</li>
           </ul>
         </div>
+
+        <div class="panel-section">
+          <span class="label">RECORDS</span>
+          <ol id="highscores-list" class="highscores-list"></ol>
+          <div class="record-stat">
+            <span class="label">BEST COMBO</span>
+            <span class="value record-value" id="best-combo">0</span>
+          </div>
+          <div class="record-stat">
+            <span class="label">MAX LINES</span>
+            <span class="value record-value" id="max-lines">0</span>
+          </div>
+          <button id="reset-records-btn" class="reset-records-btn" type="button">Resetear records</button>
+        </div>
       </aside>
     </div>
 
@@ -54,7 +76,49 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <div id="name-entry" class="name-entry hidden">
+          <p class="name-entry-label">¡Nueva puntuación en el Top 5!</p>
+          <input type="text" id="player-name-input" maxlength="10" placeholder="AAA" autocomplete="off" />
+          <button id="save-score-btn" type="button">Guardar</button>
+        </div>
         <button id="restart-btn">Reiniciar</button>
+      </div>
+    </div>
+
+    <div id="pause-overlay" class="overlay pause-overlay hidden">
+      <div class="overlay-box pause-box">
+        <p class="pause-title">PAUSA</p>
+
+        <div class="pause-menu">
+          <button id="resume-btn" class="pause-btn">Reanudar</button>
+          <button id="pause-restart-btn" class="pause-btn">Reiniciar</button>
+          <button id="controls-toggle-btn" class="pause-btn">Ver controles</button>
+        </div>
+
+        <div id="pause-controls" class="pause-controls hidden">
+          <ul>
+            <li><kbd>←</kbd><kbd>→</kbd> mover</li>
+            <li><kbd>↑</kbd> rotar</li>
+            <li><kbd>↓</kbd> bajar</li>
+            <li><kbd>Space</kbd> caída</li>
+            <li><kbd>P</kbd> pausa</li>
+          </ul>
+        </div>
+
+        <div class="pause-level">
+          <label for="start-level-select">Nivel inicial</label>
+          <select id="start-level-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
